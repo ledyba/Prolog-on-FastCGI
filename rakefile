@@ -1,0 +1,95 @@
+# coding: UTF-8
+require 'rake/packagetask'
+require 'rake/clean'
+
+#設定
+SWI_HOME_DIR = "/usr/lib/swi-prolog"
+LITTLE_ENDIAN = true
+
+###########################################################################
+##
+## 以下開発用
+##
+###########################################################################
+
+###1.9.1でうまく動かないよパッチ
+#FileUtils.module_eval %-
+#  def rake_system(*cmd)
+#    puts *cmd
+#    system(*cmd)
+#  end
+#  -
+
+###このプロジェクト用の特別な定義
+EXT_LDFLAGS = ""
+EXT_LIBS = "-lfcgi -lpl -lstdc++"
+EXT_COMMON_CFLAGS="-I#{SWI_HOME_DIR}/include #{LITTLE_ENDIAN ? "-DLITTLE_ENDIAN" : ""} -DSWI_HOME_DIR=\"\\\"#{SWI_HOME_DIR}\\\"\""
+EXT_CFLAGS = ""
+EXT_CXXFLAGS = ""
+
+SOFTWARE_NAME = "swipl-fcgid"
+
+###########################################################################
+## ファイル群
+###########################################################################
+
+###完成パッケージ
+PACKAGE = SOFTWARE_NAME
+
+SRCS  = FileList["src/**/*.cc"].exclude("**/.svn") + FileList["src/**/*.c"].exclude("**/.svn")
+HEADS = FileList["include/**/*.hh"].exclude("**/.svn") + FileList["include/**/*.h"].exclude("**/.svn")
+
+###変換
+OBJS = SRCS.ext('o')
+
+###削除するものの指定
+CLEAN.include("**/*.o")
+CLEAN.include(PACKAGE)
+
+#for windows
+CLEAN.include("**/*.exe")
+CLEAN.include(PACKAGE+".exe")
+
+###########################################################################
+## 定数定義
+###########################################################################
+
+DEBUG  = "-ggdb -pg"
+RELEASE = ""#"-s -DNDEBUG"
+
+# LD(*.o)
+LD  = "gcc"
+LDFLAGS = "-g #{EXT_LDFLAGS}"
+LDLIBS  = "#{EXT_LIBS}"
+
+# C (*.c)
+CC  = "gcc"
+CFLAGS  = "-g -O3 -Wall -I. #{EXT_COMMON_CFLAGS} #{EXT_CFLAGS}"
+
+# C++ (*.cc)
+CXX	= "g++"
+CXXFLAGS= "-g -O3 -Wall -I. #{EXT_COMMON_CFLAGS} #{EXT_CXXFLAGS}"
+
+###########################################################################
+## コンパイル時に利用するターゲット
+###########################################################################
+
+desc "default"
+task "default" => PACKAGE
+
+file PACKAGE => OBJS do |t|
+  sh "#{LD} #{LDFLAGS} #{RELEASE} #{t.prerequisites.join(' ')} -o #{t.name} #{LDLIBS}"
+end
+
+###########################################################################
+## ルール
+###########################################################################
+
+rule '.o' => '.c' do |t|
+  sh "#{CC} #{CFLAGS} -c #{t.source} -o #{t.name}"
+end
+
+rule '.o' => '.cc' do |t|
+  sh "#{CXX} #{CXXFLAGS} -c #{t.source} -o #{t.name}"
+end
+
